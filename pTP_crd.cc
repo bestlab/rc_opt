@@ -81,6 +81,7 @@ int main(int argc, char *argv[])
 	char tok[BUF_LEN], buf[BUF_LEN];
 	int ndat, nbin;
 	int nblock;
+	bool write_tplen;
 	//vector<double> pxTP, pTPx, peqx, ptmp;
 	vector<int> pxTP, pTPx, peqx, ptmp;
 	vector<int> ncross_eq,ncross_fwd, ncross_rev, ncross_tmp;
@@ -94,6 +95,7 @@ int main(int argc, char *argv[])
 	amax = 0.5;
 	bmin = 0.8;
 	nblock = 1;
+	write_tplen=false;
 
 	while (1) {
 		c=getopt(argc,argv,"ha:b:L:H:n:e:t:o:T:");
@@ -130,6 +132,7 @@ int main(int argc, char *argv[])
 				break;
 			case 'T':
 				strcpy(tplen_name,optarg);
+				write_tplen = true;
 				break;
 			case 'B':
 				nblock = atoi(optarg);
@@ -185,7 +188,9 @@ int main(int argc, char *argv[])
 	fclose(eq_rxf);
 	eq_rxf = fopen(eq_crd,"r");
 
-	tplen_out = fopen(tplen_name,"w");
+	if (write_tplen) {
+		tplen_out = fopen(tplen_name,"w");
+	}
 	state = 'i';
 	leq = 0;
 	ltp = 0;
@@ -236,7 +241,9 @@ int main(int argc, char *argv[])
 				add_data(ptmp,pxTP);
 				add_data(ptmp,peqx);
 				ltp += tt;
-				fprintf(tplen_out,"%i\n", tt);
+				if (write_tplen) {
+					fprintf(tplen_out,"%i\n", tt);
+				}
 				leq += tt+1;
 				ntp += 1;
 				state = 'B';
@@ -255,7 +262,9 @@ int main(int argc, char *argv[])
 				add_data(ptmp,pxTP);
 				add_data(ptmp,peqx);
 				ltp += tt;
-				fprintf(tplen_out,"%i\n", tt);
+				if (write_tplen) {
+					fprintf(tplen_out,"%i\n", tt);
+				}
 				leq += tt+1;
 				ntp += 1;
 				state = 'A';
@@ -297,6 +306,7 @@ int main(int argc, char *argv[])
 		fprintf(outp,"%12.6f %12.6f %12.6f %12.6f\n", xx, p_eq_x, p_x_TP, p_TP_x);
 	}
 	fclose(outp);
-	fclose(tplen_out);
+	if (write_tplen)
+		fclose(tplen_out);
 	return 0;
 }
