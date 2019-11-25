@@ -2,9 +2,10 @@ BINDIR = $(HOME)/bin
 TARGETS = rc_opt qcalc qcalc_gen assign_tp assign_tp2 constN_proj \
 	  pTP_crd qcalc_pbc xtr_pvec ave_pvec dcdinfo trunctraj crossval \
 	  extract_tp drms ave_contacts qcontig qphi drms_pbc \
-	  ferguson dcd2dcd dij qcalc_discrete quick_epert distance vector fret
+	  ferguson dcd2dcd dij qcalc_discrete quick_epert distance vector fret \
+	  dump_cmaps dump_dists qcalc_cmap
 SCRIPTS = qlist2pvec.py
-OBJECTS = random_gen.o TrajFile.o swapbytes.o
+OBJECTS = random_gen.o TrajFile.o swapbytes.o traj.o
 CFLAGS = -O3 
 
 all: $(TARGETS)
@@ -12,7 +13,7 @@ all: $(TARGETS)
 assign_tp: assign_tp.cc
 	$(CXX) $(CFLAGS) -o assign_tp assign_tp.cc
 
-extract_tp: extract_tp.cc TrajFile.o swapbytes.o
+extract_tp: extract_tp.cc TrajFile.o swapbytes.o traj.o
 	$(CXX) $(CFLAGS) -o extract_tp extract_tp.cc TrajFile.o swapbytes.o
 
 drms: drms.cc TrajFile.o swapbytes.o
@@ -41,6 +42,12 @@ ncdiff_contacts: TrajFile.o swapbytes.o ncdiff_contacts.cc config.h
 
 ave_cmap: TrajFile.o swapbytes.o ave_cmap.cc config.h
 	$(CXX) $(CFLAGS) -o ave_cmap ave_cmap.cc TrajFile.o swapbytes.o
+
+dump_cmaps: traj.o swapbytes.o dump_cmaps.cc config.h common.o
+	$(CXX) $(CFLAGS) -o dump_cmaps dump_cmaps.cc traj.o common.o swapbytes.o
+
+dump_dists: traj.o swapbytes.o dump_dists.cc config.h common.o
+	$(CXX) $(CFLAGS) -o dump_dists dump_dists.cc traj.o common.o swapbytes.o
 
 crossval: crossval.cc config.h
 	$(CXX) $(CFLAGS) -o crossval crossval.cc 
@@ -90,8 +97,8 @@ qcalc: qcalc.cc TrajFile.o swapbytes.o
 qcalc_debug: qcalc_debug.cc TrajFile.o swapbytes.o
 	$(CXX) $(CFLAGS) -o qcalc_debug TrajFile.o swapbytes.o qcalc_debug.cc
 
-qcalc_cmap: qcalc_cmap.cc TrajFile.o swapbytes.o
-	$(CXX) $(CFLAGS) -o qcalc_cmap TrajFile.o swapbytes.o qcalc_cmap.cc
+qcalc_cmap: qcalc_cmap.cc traj.o swapbytes.o common.o
+	$(CXX) $(CFLAGS) -o qcalc_cmap traj.o swapbytes.o qcalc_cmap.cc common.o
 
 kmt: kmt.cc TrajFile.o swapbytes.o
 	$(CXX) $(CFLAGS) -o kmt TrajFile.o swapbytes.o kmt.cc
@@ -119,6 +126,7 @@ TrajFile.o: TrajFile.cc TrajFile.h
 
 traj.o: traj.cc traj.h
 	$(CXX) $(CFLAGS) -c traj.cc
+
 
 common.o: common.cc common.h
 	$(CXX) $(CFLAGS) -c common.cc
