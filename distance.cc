@@ -13,7 +13,7 @@
 #include "traj.h"
 
 string usage = "\n\n	Usage:\n"
-"	distance -i idxi -j idxj go1.dcd ... goN.dcd\n"
+"	distance -i idxi -j idxj -L boxL go1.dcd ... goN.dcd\n"
 "               Just measures the distance in Angstroms between"
 "               atoms/beads with indices idxi and idxj over the trajectories\n\n";
 
@@ -31,9 +31,10 @@ int main( int argc, char ** argv )
 
 	beta = 5.0;
 	gamma = 1.0;
+	double boxL = -1.0;
 
 	while (1) {
-		c=getopt(argc,argv,"hi:j:");
+		c=getopt(argc,argv,"hi:j:L:");
 		if (c == -1)	// no more options
 			break;
 		switch (c) {
@@ -46,6 +47,9 @@ int main( int argc, char ** argv )
 				break;
 			case 'j':
 				resj = atoi(optarg);
+				break;
+			case 'L':
+				boxL = atof(optarg);
 				break;
 			default:
 				fprintf(stderr,"?? getopt returned character code 0%o ??\n", c);
@@ -113,6 +117,11 @@ int main( int argc, char ** argv )
 			dx = X[resi]-X[resj];
 			dy = Y[resi]-Y[resj];
 			dz = Z[resi]-Z[resj];
+			if (boxL>0.) {
+				dx-=boxL*round(dx/boxL);
+				dy-=boxL*round(dy/boxL);
+				dz-=boxL*round(dz/boxL);
+			}
 			dr = sqrt(dx*dx+dy*dy+dz*dz);
 			//fprintf(stdout,"%8.3f %8.3f %8.3f %8.3f\n",Z[resi],Z[resj],dz,dr);
 			fprintf(stdout,"%8.3f\n",dr);

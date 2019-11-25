@@ -45,7 +45,7 @@ const char *Usage = "\n"
 "			-q contact_list -m n_mc -T temperature -f outp_freq\n"
 "			-o outp_root -N active_contacts\n"
 "			-g mu \n"
-"			file1.dcd file2.dcd ... fileN.dcd\n"
+"			file1.dcd istp1.dat file2.dcd istp2.dat... fileN.dcd istpN.dat\n"
 "	where:\n"
 "		-d <opt> determines the optimization criterion as follows:\n"
 "			<opt>=g: Optimize maximimum of Gaussian\n"
@@ -126,6 +126,44 @@ void extend_rc_vec(vector<proj_type> &pvec, vector<proj_type> &rcut_vec,
 	return;
 }
 
+void read_index_file(vector<string> &dcd_names, vector<string> &istp_names, const string &index_name)
+{
+	int nline;
+	int tmpi;
+	const int L= 1024;
+	char buf[L];
+	ifstream inp;
+	inp.open(index_name.c_str());
+	//FILE *inp;
+	//inp = fopen(index_name.c_str(),"r");
+	//if (f==NULL) {
+	//	fprintf(stderr,"Couldn't open index file %s\n",index_name.c_str());
+	//	exit(1);
+	//}
+	//fgets(buf,L,f);
+	nline = 0;
+	while (!inp.eof()) {
+		//inp >> buf >> buf;
+		inp.getline(buf,L);
+		//fprintf(stdout,"%s\n",buf);
+		nline++;
+	}
+	nline--;
+	cerr << "Number of files = " << nline << endl;
+	inp.close();
+	inp.clear();
+	inp.open(index_name.c_str());
+	dcd_names.resize(nline);
+	istp_names.resize(nline);
+	for (int l=0; l<nline; l++) {
+		inp >> dcd_names[l] >> istp_names[l];
+		cerr << dcd_names[l] << istp_names[l] << endl;
+	}
+	inp.close();
+	inp.clear();
+	return;
+}
+
 void read_istp(vector<string> &istp_names, int *isTP, int skip, int nsave)
 {
 	ifstream inp;
@@ -177,6 +215,7 @@ int read_trajectories(vector<string> &dcd_names, crd_type *X, crd_type *Y, crd_t
 	nsave = 0;
 	for (int t=0; t<ntraj; t++) {
 		string st;
+		fprintf(stdout,"reading %s\n",dcd_names[t].c_str());
 		inptraj = open_trajectory(dcd_names[t].c_str());
 		//open_trajectory(st,inptraj);
 		natom_trj = inptraj->num_atoms();
@@ -186,10 +225,9 @@ int read_trajectories(vector<string> &dcd_names, crd_type *X, crd_type *Y, crd_t
 			fprintf(stderr,"	structure: %i\n",natom);
 			exit(1);
 		}
-		//int nframe = inptraj->total_frames();
-		int i = 0;
-		while (inptraj->frames_left()) {
-		//for (int i=0; i<nframe; i++) {
+		int nframe = inptraj->total_frames();
+		//while (inptraj->frames_left()) {
+		for (int i=0; i<nframe; i++) {
 			if (i%skip != 0) {
 				inptraj->read_frame(xtmp,ytmp,ztmp,natom);
 			} else {
@@ -197,6 +235,8 @@ int read_trajectories(vector<string> &dcd_names, crd_type *X, crd_type *Y, crd_t
 				nsave++;
 			}
 			if (nsave == max_save) {
+				fprintf(stdout,"nsave = %i\n",nsave);
+				fprintf(stdout,"max_save = %i\n",max_save);
 				fprintf(stderr,"nsave > maxsave!!! (How does that happen?)\n");
 				delete [] xtmp;
 				delete [] ytmp;
@@ -734,6 +774,7 @@ int main(int argc, char **argv)
 	bool change_cutoffs = false;
 	bool noswap = false;
 	bool posweights = false;
+	bool proj_only = false;
 	int nmove = 7;
 	double weightsum;
 	int natom, dim, move_type;		
@@ -741,7 +782,7 @@ int main(int argc, char **argv)
 	vector<int> active_ind, best_active_ind;
 	double ptot, ptot_trial, psdev, psdev_trial, pmean, pmean_trial, crit, crit_trial, best_crit;
 	vector<string> dcd_names, istp_names;
-	string pdb_name, oroot, qfile,pvec_traj_name, contact_file, pvec_tmpf;
+	string pdb_name, index_name, oroot, qfile,pvec_traj_name, contact_file, pvec_tmpf;
 	int skip, c, nbin, ntraj, nsave, n_proj_save, max_save, tmpi, tmpj;
 	double bin_lo, bin_hi;
 	crd_type *X, *Y, *Z;
@@ -778,17 +819,19 @@ int main(int argc, char **argv)
 	FILE *proj_out, *pvec_out, *pvec_traj; //, *ptp_out;
 	string proj_name, pvec_name, ptp_name;
 
+	fprintf(stderr,"got started!\n");
 	curtime(clock_start,us);
 	if (argc < 3) {
 		fprintf(stderr,Usage);
 		exit(1);
 	}
+	index_name = "NONE";
 	active_contacts = 0;
 	skip = 10;
 	T = 0.0;	// default reduces to original algorithm
 	outp_freq = 100;
 	while (1) {
-		c=getopt(argc,argv,"hL:H:n:m:s:p:c:o:q:d:r:T:f:N:x:FPg:K:k:");
+		c=getopt(argc,argv,"hL:H:n:m:s:p:c:o:q:d:r:T:f:N:x:FPg:K:k:i:R");
 		if (c == -1)	// no more options
 			break;
 		switch (c) {
@@ -857,6 +900,12 @@ int main(int argc, char **argv)
 			case 'P':
 				posweights = true;
 				break;
+			case 'i':
+				index_name = optarg;
+				break;
+			case 'R':
+				proj_only = true;
+				break;
 			default:
 				fprintf(stderr,"?? getopt returned character code 0%o ??\n", c);
 				fprintf(stderr,"%s\n",Usage);
@@ -864,12 +913,21 @@ int main(int argc, char **argv)
 		}
 	}
 	uniform.initialize(random_seed);
-	ntraj = (argc-optind)/2;	// half dcd, half istp
-	dcd_names.resize(ntraj);
-	istp_names.resize(ntraj);
-	for (int i=0; i<ntraj; i++) {
-		dcd_names[i] = argv[optind+2*i];
-		istp_names[i] = argv[optind+2*i+1];
+	if (index_name == "NONE") {
+		fprintf(stderr,"reading file names from command line!\n");
+		fflush(stderr);
+		ntraj = (argc-optind)/2;	// half dcd, half istp
+		dcd_names.resize(ntraj);
+		istp_names.resize(ntraj);
+		for (int i=0; i<ntraj; i++) {
+			dcd_names[i] = argv[optind+2*i];
+			istp_names[i] = argv[optind+2*i+1];
+		}
+	} else {
+		fprintf(stderr,"reading file names!\n");
+		fflush(stderr);
+		read_index_file(dcd_names, istp_names, index_name);
+		ntraj=dcd_names.size();
 	}
 	inptraj = open_trajectory(dcd_names[0].c_str());
 	natom = inptraj->num_atoms();
@@ -953,6 +1011,7 @@ int main(int argc, char **argv)
 	fprintf(stdout,"         Number of atoms = %i\n", natom);
 	fprintf(stdout,"Contact vector dimension = %i\n", dim);
 	fprintf(stdout,"Number of Active Weights = %i\n", active_contacts);
+	fprintf(stdout,"number of trajectors = %i\n",ntraj);
 	fprintf(stdout,"Trajectory files:\n");
 	for (int i=0; i<ntraj; i++) {
 		fprintf(stdout,"%s\n",dcd_names[i].c_str());
@@ -994,7 +1053,9 @@ int main(int argc, char **argv)
 
 	// calculate initial pTPr
 	proj_calc_active(pvec, rcut_vec, active_ind, X, Y, Z, natom, nsave, proj);
+
 	pTPr_calc(isTP,proj, nsave, bin_lo, bin_hi, nbin, p_r, p_rTP, p_TPr);
+	fprintf(stderr,"GOT HERE 0");
 	switch (decider) {
 		case 'g':
 			crit = pTP_gauss(p_TPr);
@@ -1034,7 +1095,11 @@ int main(int argc, char **argv)
 		fprintf(proj_out,"%12.8e\n",proj[i]);
 	}
 	fclose(proj_out);
+	fprintf(stderr,"GOT HERE 1");
 	ptp_name = oroot + string("_pTP_ini.dat");
+	if (proj_only) {
+		exit(0);
+	}
 	write_ptp(ptp_name.c_str(), bin_lo, bin_hi, nbin, p_r, p_rTP, p_TPr);
 	pvec_traj_name = oroot + string("_pvec_trj.dat");
 	pvec_traj = fopen(pvec_traj_name.c_str(),"w");

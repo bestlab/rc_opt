@@ -8,6 +8,8 @@
 #include <fstream>
 #include <string>
 #include <cmath>
+#include <cstdlib>
+#include "unistd.h"
 
 #include "TrajFile.h"
 

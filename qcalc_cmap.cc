@@ -8,8 +8,9 @@
 #include <fstream>
 #include <string>
 #include <cmath>
+#include <unistd.h>
 
-#include "TrajFile.h"
+#include "traj.h"
 
 string usage = "\n\n	Usage:\n"
 "	qcalc [-g gamma] [-b beta] go.qlist ncout.dat go1.dcd ... goN.dcd\n"
@@ -116,27 +117,58 @@ int main( int argc, char ** argv )
 	}
 	// holds reference coordinates
 
-	DCDITrajFile inptraj;
-	inptraj.open(dcd_names[0].c_str());
-	natom = inptraj.num_atoms();
-	inptraj.close();
+	//DCDITrajFile inptraj;
+	//inptraj.open(dcd_names[0].c_str());
+	BaseITrajFile *inptraj;
+	int slen = dcd_names[0].size();
+	if (slen-dcd_names[0].rfind(string(".dcd"))==4) {
+		fprintf(stdout,"DCD file\n"); 
+		inptraj = new DCDITrajFile(dcd_names[0].c_str());
+	} else if (slen-dcd_names[0].rfind(string(".xtc"))==4) {
+		fprintf(stdout,"XTC file\n");
+		inptraj = new XTCITrajFile(dcd_names[0].c_str());
+	} else {
+		fprintf(stderr,"unknown trajectory file type:\n");
+		fprintf(stderr,"%s\n\n", dcd_names[0].c_str());
+		exit(1);
+	}
+
+	natom = inptraj->num_atoms();
+	inptraj->close();
 	double *X = new double[natom];
 	double *Y = new double[natom];
 	double *Z = new double[natom];
 	int frames = 0;
+	int frames_used = 0;
 	// first pass to compute mean coordinates
 	FILE *outp = fopen(output.c_str(),"w");
 	for (int trajfile=0; trajfile<dcd_names.size(); trajfile++) {
+		int slen = dcd_names[trajfile].size();
+		if (slen-dcd_names[trajfile].rfind(string(".dcd"))==4) {
+			fprintf(stdout,"DCD file\n"); 
+			inptraj = new DCDITrajFile(dcd_names[trajfile].c_str());
+		} else if (slen-dcd_names[trajfile].rfind(string(".xtc"))==4) {
+			fprintf(stdout,"XTC file\n");
+			inptraj = new XTCITrajFile(dcd_names[trajfile].c_str());
+		} else {
+			fprintf(stderr,"unknown trajectory file type:\n");
+			fprintf(stderr,"%s\n\n", dcd_names[trajfile].c_str());
+			exit(1);
+		}
+
 		// iterate over frames ...
-		inptraj.open( dcd_names[trajfile].c_str() );
+		//inptraj.open( dcd_names[trajfile].c_str() );
 		//int no_frames = inptraj.total_frames();
-		int no_frames = inptraj.actual_frames();
-		for (int frame = 0; frame < no_frames; frame++) {
-			inptraj.read_frame(X,Y,Z,natom);
-			if (frame < first && first > 0) 
+		//int no_frames = inptraj->actual_frames();
+		//for (int frame = 0; frame < no_frames; frame++) {
+		while (inptraj->frames_left()) {
+			inptraj->read_frame(X,Y,Z,natom);
+			frames++;
+			if (frames < first && first > 0) 
 				continue;
-			if (frame > last && last > 0) 
+			if (frames > last && last > 0) 
 				continue;
+			frames_used++;
 			double Q = 0.0;
 			double CO = 0.0;
 			double Q2 = 0.0;
@@ -151,12 +183,13 @@ int main( int argc, char ** argv )
 				double q = 1.0/(1.0+exp(beta*(dr-rij[t])));
 				qave[t] += q;
 			}
-			frames++;
 		}
-		inptraj.close();
+		inptraj->close();
+		delete inptraj;
 	}
+	fprintf(stdout,"Frames used = %i\n",(frames_used));
 	for (int t=0; t<ncontact; t++) {
-		qave[t] /= float(frames);
+		qave[t] /= float(frames_used);
 	}
 	for (int ix=0; ix<natom; ix++) {
 		for (int jx=0; jx< natom; jx++) {
