@@ -24,8 +24,9 @@ Purpose: Implementation of trajectory file i/o using interface defined
 
 #include <cstdio>
 #include <iostream>
-#include <rpc/rpc.h>
-#include <rpc/xdr.h>
+//#include <rpc/rpc.h>
+//#include <rpc/xdr.h>
+#include "gmx_internal_xdr.h"
 #include "traj.h"
 #include "common.h"
 
@@ -381,15 +382,15 @@ a dcd file, or has been corrupted (e.g. by ascii ftp).");
 	        icount = fread( &tmp, sizeof(int64_t), 1, dcdfile ); 
 	        icount = fread( typestr, sizeof(char), 4, dcdfile ); // get file type 
 		if ( strncmp( typestr, "CORD", 4) == 0 ) {
-			fprintf(stderr,"COORDINATES\n");
+			fprintf(stdout,"COORDINATES\n");
 			type = 'c';
 			sfbita = true;
-			fprintf(stderr,"DCD file actually has 64 bit integers\n");
+			fprintf(stdout,"DCD file actually has 64 bit integers\n");
 		} else if ( strncmp( typestr, "VELD", 4) == 0 ) {
-			fprintf(stderr,"VELOCITIES\n");
+			fprintf(stdout,"VELOCITIES\n");
 			type = 'v';
 			sfbita = true;
-			fprintf(stderr,"DCD file actually has 64 bit integers\n");
+			fprintf(stdout,"DCD file actually has 64 bit integers\n");
 		} else {
 			fprintf(stderr,"Unknown file type: %s\n", typestr);
 			print_err( "DCDITrajFile::open", 
@@ -1448,7 +1449,7 @@ DCDOTrajFile::DCDOTrajFile( const char * filename )
  * ____________________________________________________________________ *
  * 	construct output trajectory based on input			*
  ************************************************************************/
-DCDOTrajFile::DCDOTrajFile( DCDITrajFile & inptraj )
+DCDOTrajFile::DCDOTrajFile( const DCDITrajFile & inptraj )
 {
 	setup( inptraj );
 }
@@ -1468,7 +1469,7 @@ DCDOTrajFile::~DCDOTrajFile()
  * ____________________________________________________________________ *
  * 	setup parameters for output trajectory based on input		*
  ************************************************************************/
-void DCDOTrajFile::setup( DCDITrajFile & inptraj)
+void DCDOTrajFile::setup( const DCDITrajFile & inptraj)
 {
 	type = inptraj.traj_type();
 	nframes = inptraj.total_frames();
@@ -1535,9 +1536,9 @@ void DCDOTrajFile::close()
 {
 	if (file_open == 1)
 	{
-		if (curr_frame != nframes) {
-			rewrite_frames_and_steps( curr_frame );
-		}
+		//if (curr_frame != nframes) {
+		//	rewrite_frames_and_steps( curr_frame );
+		//}
 		fclose( dcdfile );
 #ifdef DEBUG
 		cout << "Trying to remove coordinate memory alloc ..." << endl;
@@ -1839,14 +1840,12 @@ void DCDOTrajFile::rewrite_frames_and_steps( int f )
 
 XTCITrajFile::XTCITrajFile()
 {
-	file_open=0;
-	header="";
-	curr_frame=0;
+	file_open = false;
 }
 
 XTCITrajFile::XTCITrajFile(const char * file)
 {
-	file_open = 0;
+	file_open = false;
 	open(file);
 }
 
@@ -1892,13 +1891,13 @@ int XTCITrajFile::open(const char * file)
 		exit(1);
 #endif
 	}
-	fprintf(stderr,"magic = %i\n",magic);
+	//fprintf(stdout,"magic = %i\n",magic);
 	xx = xdr_int(xdr,&N);
-	fprintf(stderr,"N = %i\n",N);
+	//fprintf(stdout,"N = %i\n",N);
 	xx = xdr_int(xdr,&istep);
-	fprintf(stderr,"step = %i\n",istep);
+	//fprintf(stdout,"step = %i\n",istep);
 	xx = xdr_float(xdr,&itime);
-	fprintf(stderr,"itime = %12.6e\n",itime);
+	//fprintf(stdout,"itime = %12.6e\n",itime);
 	//fprintf(stdout,"xdr_int = %i\n",xx);
 	//fprintf(stdout,"magic = %i\n",magic);
 	
@@ -1908,7 +1907,6 @@ int XTCITrajFile::open(const char * file)
 	Z =  new float[N];
 	first = true;
 	moredata = true;
-	counter = 0;
   
 	return 0;
 }
@@ -2401,8 +2399,8 @@ void XTCITrajFile::read_frame(float *XX, float *YY, float *ZZ, int n)
 	//	fprintf(stdout,"c[%i] = %12.6e\n",j,c[j]);
 	}
 	A = sqrt(dotpn(a,a,3));
-	B = sqrt(dotpn(a,a,3));
-	C = sqrt(dotpn(a,a,3));
+	B = sqrt(dotpn(b,b,3));
+	C = sqrt(dotpn(c,c,3));
 	alpha = acos(dotpn(b,c,3)/(B*C));
 	beta  = acos(dotpn(a,c,3)/(A*C));
 	gamma = acos(dotpn(a,b,3)/(A*B));
@@ -2458,7 +2456,6 @@ void XTCITrajFile::read_frame(float *XX, float *YY, float *ZZ, int n)
 	if (!xx) {
 		moredata = false;
 	}
-	counter++;
 }
 
 
@@ -2486,27 +2483,135 @@ void XTCITrajFile::get_crystal_data(double *rdata) const
 		rdata[i] = crystal_data[i];
 }
 
-int XTCITrajFile::total_frames() // try not to use this function!
-{ 
-	int nframe;
-	long spos = ftell(xtcfile);
-	int saved_counter = counter;
-	bool saved_moredata = moredata;
-	float *X = new float[N];
-	float *Y = new float[N];
-	float *Z = new float[N];
-	while (frames_left()) {
-		read_frame(X,Y,Z,N);
+/************************************************************************
+ *	XTCOTrajFile::XTCOTrajFile()					*
+ ************************************************************************/
+int XTCOTrajFile::open(const char *file)
+{
+	int magic;
+	XDR *xd;
+	magic = XTC_MAGIC;
+	if (file_open) {
+		print_err( "XTCOTrajFile::open", 
+				"A trajectory is already open");
+#ifndef SWIG
+		throw OpenErr();
+#else
+		exit(1);
+#endif
 	}
-	nframe = counter;
-	// reset to where we were...
-	fseek(xtcfile,spos,SEEK_SET);
-	moredata = saved_moredata;
-	counter = saved_counter;
+	xtcfile = fopen(file,"w");
+	if ( xtcfile == NULL ) {
+		print_err( "XTCOTrajFile::open", 
+				"could not open trajectory file");
+#ifndef SWIG
+		throw OpenErr();
+#else
+		exit(1);
+#endif
+	}
+	xdr = new XDR;
+	int xx;
+	xdrstdio_create(xdr,xtcfile,XDR_ENCODE);
+	xx = xdr_int(xdr,&magic);
+	xx = xdr_int(xdr,&N);
+	xx = xdr_int(xdr,&istep);
+	xx = xdr_float(xdr,&itime);
+	X = new float[N];
+	Y = new float[N];
+	Z = new float[N];
+	XYZ = new float[3*N];
+	//fprintf(stdout,"xdr_int = %i\n",xx);
+	//fprintf(stdout,"magic = %i\n",magic);
+
+
+}
+
+XTCOTrajFile::XTCOTrajFile()
+{
+	nframes = 0;
+	itime = 0;
+	istep = 0;
+	nsave = 50;
+	nsteps = 0;
+	dof = 0;
+	nfixed = 0;
+	delta = 0.2045;		// 1 fs in AKMA units (see usage.doc)
+	N = 0;
+	xtcfile = NULL;
+	start_record = 0;
+	file_open = 0;
+	header = "";
+	curr_frame = 0;
+	X = Y = Z = NULL;
+}
+
+/************************************************************************
+ *	XTCOTrajFile::XTCOTrajFile()					*
+ * ____________________________________________________________________ *
+ * 	open XTC file trajectory for output				*
+ ************************************************************************/
+XTCOTrajFile::XTCOTrajFile( const char * filename )
+{
+	nframes = 0;
+	dof = 0;
+	itime = 0;
+	nsave = 50;
+	nsteps = 0;
+	nfixed = 0;
+	delta = 0.2045;		// 1 fs in AKMA units (see usage.doc)
+	N = 0;
+	xtcfile = NULL;
+	start_record = 0;
+	file_open = 0;
+	header = "";
+	curr_frame = 0;
+	X = Y = Z = NULL;
+	open( filename );	
+}
+
+/************************************************************************
+ *	XTCOTrajFile::XTCOTrajFile()					*
+ * ____________________________________________________________________ *
+ * 	construct output trajectory based on input			*
+ ************************************************************************/
+XTCOTrajFile::XTCOTrajFile( const XTCITrajFile & inptraj )
+{
+	setup( inptraj );
+}
+
+/************************************************************************
+ *	XTCOTrajFile::setup()						*
+ * ____________________________________________________________________ *
+ * 	setup parameters for output trajectory based on input		*
+ ************************************************************************/
+void XTCOTrajFile::setup( const XTCITrajFile & inptraj)
+{
+	nframes = inptraj.total_frames();
+	itime = inptraj.initial_step();
+	nsave = inptraj.frame_freq();
+	//nsteps = inptraj.total_steps();
+	//dof = inptraj.deg_free();
+	delta = inptraj.step_size();
+	N = inptraj.num_atoms();
+	//inptraj.read_title(header);
+	X = new float[N];
+	Y = new float[N];
+	Z = new float[N];
+}
+
+/************************************************************************
+ *	XTCOTrajFile::~XTCOTrajFile()					*
+ * ____________________________________________________________________ *
+ * 	Die								*
+ ************************************************************************/
+XTCOTrajFile::~XTCOTrajFile()
+{
+	fclose(xtcfile);
 	delete [] X;
 	delete [] Y;
 	delete [] Z;
-	return nframe;
+	delete [] XYZ;
 }
 
 BaseITrajFile* open_trajectory(const string &fs)
@@ -2525,4 +2630,5 @@ BaseITrajFile* open_trajectory(const string &fs)
 		exit(1);
 	}
 }
+
 
