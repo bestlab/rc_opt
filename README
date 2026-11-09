@@ -1,0 +1,70 @@
+
+Code to evaluate reaction coordinates and to optimize 
+contact-based coordinates. 
+
+References:
+https://doi.org/10.1063/1.1630572
+https://doi.org/10.1073/pnas.0408098102 
+https://doi.org/10.1021/acs.jpcb.5b09741
+
+Documentation and tests to be added.
+
+- 
+
+assign_tp.cc	: Assign transition paths based on some progress variable (which need not be a very good rc
+assign_tp2.cc
+
+ave_cmap.cc	: average contact map
+ave_contacts.cc
+ave_pvec.cc
+
+common.cc 	: common stuff
+common.h
+config.h
+
+constN_proj.cc
+
+crossval.cc
+dcd2dcd.cc
+dcdinfo.cc
+dij.cc
+distance.cc
+drms.cc
+drms_pbc.cc
+dump_cmaps.cc
+dump_dists.cc
+extract_tp.cc
+ferguson.cc
+fixaaqaa.cc
+fret.cc
+go_correct.cc
+kmt.cc
+lqcalc.cc
+Makefile
+ncdiff_contacts.cc
+pTP_crd.cc
+pvec2mat.py
+pvec2qlist.py
+qcalc.cc
+qcalc_cmap.cc
+qcalc_discrete.cc
+qcalc_gen.cc
+qcalc_pbc.cc
+qcontig.cc
+qlist2pvec.py
+qphi.cc
+quick_epert.cc
+random_gen.cc
+random_gen.h
+rc_opt.cc		: main rc opt code
+sum_ptp.py
+swapbytes.cc
+swapbytes.h
+traj.cc
+TrajFile.cc
+TrajFile.h
+traj.h
+trunctraj.cc
+tTP_crd.cc
+vector.cc
+xtr_pvec.cc
